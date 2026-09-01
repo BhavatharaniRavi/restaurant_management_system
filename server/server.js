@@ -28,6 +28,8 @@ const allowedOrigins = new Set([
   "http://127.0.0.1:5173",
   "http://127.0.0.1:5174",
   "http://127.0.0.1:5175",
+    // Vercel frontend
+  "https://restaurant-management-system-bhava3.vercel.app",
 ]);
 
 if (process.env.CLIENT_URL) {
