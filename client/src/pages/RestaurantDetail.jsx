@@ -18,6 +18,7 @@ export default function RestaurantDetail() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+
   const [restaurant, setRestaurant] = useState(null);
   const [categories, setCategories] = useState([]);
   const [items, setItems] = useState([]);
@@ -28,43 +29,121 @@ export default function RestaurantDetail() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const load = async () => {
+    const loadRestaurantDetails = async () => {
+      // Prevent API calls when restaurant ID is missing
+      if (!id) {
+        setError("Restaurant ID is missing.");
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
+      setError("");
+
       try {
+        console.log("Loading restaurant with ID:", id);
+
         const [restRes, catRes, menuRes] = await Promise.all([
           api.get(`/restaurants/${id}`),
-          api.get("/categories", { params: { restaurantId: id } }),
-          api.get("/menu", { params: { restaurantId: id } }),
+
+          api.get("/categories", {
+            params: {
+              restaurantId: id,
+            },
+          }),
+
+          api.get("/menu", {
+            params: {
+              restaurantId: id,
+            },
+          }),
         ]);
+
+        console.log("Restaurant response:", restRes.data);
+        console.log("Category response:", catRes.data);
+        console.log("Menu response:", menuRes.data);
+
         setRestaurant(restRes.data.restaurant);
-        setCategories(catRes.data.categories);
-        setItems(menuRes.data.items);
+        setCategories(catRes.data.categories || []);
+        setItems(menuRes.data.items || []);
       } catch (err) {
-        setError(err.response?.data?.message || "Failed to load restaurant details");
+        console.error("Restaurant details error:", err);
+
+        setError(
+          err.response?.data?.message ||
+            "Failed to load restaurant details."
+        );
       } finally {
         setLoading(false);
       }
     };
-    load();
+
+    loadRestaurantDetails();
   }, [id]);
 
   const filteredItems = items.filter((item) => {
-    const matchesCategory = activeCategory === "all" || item.categoryId?._id === activeCategory;
-    const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase());
+    const matchesCategory =
+      activeCategory === "all" ||
+      item.categoryId?._id === activeCategory;
+
+    const matchesSearch =
+      item.name?.toLowerCase().includes(search.toLowerCase());
+
     return matchesCategory && matchesSearch;
   });
 
-  if (loading) return <Loader />;
-  if (error) return <div className="alert-error">{error}</div>;
-  if (!restaurant) return null;
-
   const handleReserve = () => {
     if (!user || user.role !== "customer") {
-      navigate("/login", { state: { from: location.pathname } });
+      navigate("/login", {
+        state: {
+          from: location.pathname,
+        },
+      });
       return;
     }
+
     navigate(`/restaurants/${id}/reserve`);
   };
+
+  if (loading) {
+    return <Loader />;
+  }
+
+  if (error) {
+    return (
+      <div className="page-container">
+        <div className="alert-error">
+          {error}
+        </div>
+
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={() => navigate("/restaurants")}
+        >
+          Back to Restaurants
+        </button>
+      </div>
+    );
+  }
+
+  if (!restaurant) {
+    return (
+      <div className="page-container">
+        <div className="alert-error">
+          Restaurant not found.
+        </div>
+
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={() => navigate("/restaurants")}
+        >
+          Back to Restaurants
+        </button>
+      </div>
+    );
+  }
 
   const galleryImages = [
     restaurant.imageUrl || galleryFallbacks[0],
@@ -74,50 +153,105 @@ export default function RestaurantDetail() {
   ];
 
   const roomDetails = [
-    { title: "Dining Hall", description: "Warm lighting, premium seating, and elegant interiors for relaxed meals." },
-    { title: "Private Rooms", description: "Intimate spaces for birthdays, family dinners, and business meetings." },
-    { title: "Terrace Lounge", description: "Open-air seating with a scenic city view and cozy evening vibes." },
-    { title: "Chef's Table", description: "Close-up dining experience with a front-row view of kitchen craftsmanship." },
+    {
+      title: "Dining Hall",
+      description:
+        "Warm lighting, premium seating, and elegant interiors for relaxed meals.",
+    },
+    {
+      title: "Private Rooms",
+      description:
+        "Intimate spaces for birthdays, family dinners, and business meetings.",
+    },
+    {
+      title: "Terrace Lounge",
+      description:
+        "Open-air seating with a scenic city view and cozy evening vibes.",
+    },
+    {
+      title: "Chef's Table",
+      description:
+        "Close-up dining experience with a front-row view of kitchen craftsmanship.",
+    },
   ];
 
   return (
     <div className="page-container">
+
+      {/* Restaurant Header */}
       <div className="restaurant-header">
         <div>
           <p className="eyebrow">Signature dining</p>
+
           <h1>{restaurant.name}</h1>
-          <p className="muted">{restaurant.cuisine} · {restaurant.address}</p>
+
+          <p className="muted">
+            {restaurant.cuisine} · {restaurant.address}
+          </p>
+
           <StarRating value={restaurant.rating || 0} />
-          <p className="muted small">Open {restaurant.openingHours?.open} - {restaurant.openingHours?.close}</p>
+
+          <p className="muted small">
+            Open {restaurant.openingHours?.open || "N/A"} -{" "}
+            {restaurant.openingHours?.close || "N/A"}
+          </p>
         </div>
-        <button type="button" className="btn-primary" onClick={handleReserve}>
-          {user && user.role === "customer" ? "Reserve a Table" : "Login to Book"}
+
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={handleReserve}
+        >
+          {user && user.role === "customer"
+            ? "Reserve a Table"
+            : "Login to Book"}
         </button>
       </div>
 
+      {/* Main Tabs */}
       <div className="restaurant-view-tabs">
         <button
           type="button"
-          className={activeView === "restaurant" ? "tab active" : "tab"}
+          className={
+            activeView === "restaurant"
+              ? "tab active"
+              : "tab"
+          }
           onClick={() => setActiveView("restaurant")}
         >
           Restaurant
         </button>
+
         <button
           type="button"
-          className={activeView === "food" ? "tab active" : "tab"}
+          className={
+            activeView === "food"
+              ? "tab active"
+              : "tab"
+          }
           onClick={() => setActiveView("food")}
         >
           Food Menu
         </button>
       </div>
 
+      {/* Restaurant View */}
       {activeView === "restaurant" ? (
         <>
           <div className="restaurant-gallery-grid">
             {galleryImages.map((image, index) => (
-              <div key={`${restaurant.name}-${index}`} className={`restaurant-gallery-item ${index === 0 ? "wide" : ""}`}>
-                <img src={image} alt={`${restaurant.name} view ${index + 1}`} />
+              <div
+                key={`${restaurant._id || restaurant.name}-${index}`}
+                className={
+                  index === 0
+                    ? "restaurant-gallery-item wide"
+                    : "restaurant-gallery-item"
+                }
+              >
+                <img
+                  src={image}
+                  alt={`${restaurant.name} view ${index + 1}`}
+                />
               </div>
             ))}
           </div>
@@ -126,56 +260,110 @@ export default function RestaurantDetail() {
             <div className="section-heading compact">
               <div>
                 <p className="eyebrow">Ambience</p>
-                <h2>Spaces designed for memorable moments</h2>
+
+                <h2>
+                  Spaces designed for memorable moments
+                </h2>
               </div>
             </div>
 
             <div className="room-grid">
               {roomDetails.map((room) => (
-                <div key={room.title} className="room-card">
-                  <div className="room-card-visual">🏨</div>
+                <div
+                  key={room.title}
+                  className="room-card"
+                >
+                  <div className="room-card-visual">
+                    🏨
+                  </div>
+
                   <h3>{room.title}</h3>
-                  <p className="muted">{room.description}</p>
+
+                  <p className="muted">
+                    {room.description}
+                  </p>
                 </div>
               ))}
             </div>
           </div>
         </>
       ) : (
+
+        /* Food Menu */
         <div className="section-block">
+
           <div className="menu-toolbar">
+
             <div className="category-tabs">
-              <button className={activeCategory === "all" ? "tab active" : "tab"} onClick={() => setActiveCategory("all")}>
+
+              <button
+                type="button"
+                className={
+                  activeCategory === "all"
+                    ? "tab active"
+                    : "tab"
+                }
+                onClick={() =>
+                  setActiveCategory("all")
+                }
+              >
                 All
               </button>
-              {categories.map((c) => (
+
+              {categories.map((category) => (
                 <button
-                  key={c._id}
-                  className={activeCategory === c._id ? "tab active" : "tab"}
-                  onClick={() => setActiveCategory(c._id)}
+                  type="button"
+                  key={category._id}
+                  className={
+                    activeCategory === category._id
+                      ? "tab active"
+                      : "tab"
+                  }
+                  onClick={() =>
+                    setActiveCategory(category._id)
+                  }
                 >
-                  {c.name}
+                  {category.name}
                 </button>
               ))}
+
             </div>
+
             <input
               type="text"
+              id="menu-search"
+              name="menu-search"
+              autoComplete="off"
               placeholder="Search menu..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) =>
+                setSearch(e.target.value)
+              }
               className="menu-search"
             />
+
           </div>
 
           {filteredItems.length === 0 ? (
-            <p className="muted">No menu items match your search.</p>
+            <p className="muted">
+              No menu items match your search.
+            </p>
           ) : (
             <div className="menu-grid">
+
               {filteredItems.map((item) => (
-                <MenuItemCard key={item._id} item={{ ...item, restaurantId: id }} />
+                <MenuItemCard
+                  key={item._id}
+                  item={{
+                    ...item,
+                    restaurantId: id,
+                  }}
+                />
               ))}
+
             </div>
           )}
+
         </div>
       )}
     </div>
